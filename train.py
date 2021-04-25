@@ -27,15 +27,15 @@ class Trainer(object):
         #                                 split='val',
         #                                 base_size=cfg["model"]["base_size"], 
         #                                 crop_size=cfg["model"]["crop_size"])
-        train_dataset = SUNRGBDLoader(root = cfg["train"]["data_path"],
-                                      split = "training",
-                                      is_transform = True, 
-                                      img_size = (480, 480)
+        train_dataset = SUNRGBDLoader(root=cfg["train"]["data_path"],
+                                      split="training",
+                                      is_transform=True,
+                                      img_size=(480, 480)
                                       )
-        val_dataset = SUNRGBDLoader(root = cfg["train"]["data_path"],
-                                    split = "val",
-                                    is_transform = True, 
-                                    img_size = (480, 480)
+        val_dataset = SUNRGBDLoader(root=cfg["train"]["data_path"],
+                                    split="val",
+                                    is_transform=True,
+                                    img_size=(480, 480)
                                     )
         self.train_dataloader = data.DataLoader(dataset=train_dataset,
                                                 batch_size=cfg["train"]["train_batch_size"],
