@@ -7,8 +7,10 @@ import torch.nn as nn
 import torch.utils.data as data
 
 from dataset import CityscapesDataset
+from dataset.sunrgbd_loader import SUNRGBDLoader
 from models import ICNet
 from utils import ICNetLoss, IterationPolyLR, SegmentationMetric, SetupLogger
+
 
 class Trainer(object):
     def __init__(self, cfg):
@@ -17,14 +19,24 @@ class Trainer(object):
         self.dataparallel = torch.cuda.device_count() > 1
         
         # dataset and dataloader
-        train_dataset = CityscapesDataset(root = cfg["train"]["cityscapes_root"], 
-                                          split='train', 
-                                          base_size=cfg["model"]["base_size"], 
-                                          crop_size=cfg["model"]["crop_size"])
-        val_dataset = CityscapesDataset(root = cfg["train"]["cityscapes_root"], 
-                                        split='val',
-                                        base_size=cfg["model"]["base_size"], 
-                                        crop_size=cfg["model"]["crop_size"])
+        # train_dataset = CityscapesDataset(root = cfg["train"]["cityscapes_root"], 
+        #                                   split='train', 
+        #                                   base_size=cfg["model"]["base_size"], 
+        #                                   crop_size=cfg["model"]["crop_size"])
+        # val_dataset = CityscapesDataset(root = cfg["train"]["cityscapes_root"], 
+        #                                 split='val',
+        #                                 base_size=cfg["model"]["base_size"], 
+        #                                 crop_size=cfg["model"]["crop_size"])
+        train_dataset = SUNRGBDLoader(root = cfg["train"]["data_path"],
+                                      split = "training",
+                                      is_transform = True, 
+                                      img_size = (480, 480)
+                                      )
+        val_dataset = SUNRGBDLoader(root = cfg["train"]["data_path"],
+                                    split = "val",
+                                    is_transform = True, 
+                                    img_size = (480, 480)
+                                    )
         self.train_dataloader = data.DataLoader(dataset=train_dataset,
                                                 batch_size=cfg["train"]["train_batch_size"],
                                                 shuffle=True,
