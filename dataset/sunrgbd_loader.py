@@ -76,10 +76,10 @@ class SUNRGBDLoader(data.Dataset):
         # img_number = img_path.split('/')[-1]
         # lbl_path = os.path.join(self.root, 'annotations', img_number).replace('jpg', 'png')
 
-        img = Image.imread(img_path)
+        img = Image.open(img_path)
         img = np.array(img, dtype=np.uint8)
 
-        lbl = Image.imread(lbl_path)
+        lbl = Image.open(lbl_path)
         lbl = np.array(lbl, dtype=np.uint8)
 
         if not (len(img.shape) == 3 and len(lbl.shape) == 2):
@@ -94,7 +94,8 @@ class SUNRGBDLoader(data.Dataset):
         return img, lbl
 
     def transform(self, img, lbl):
-        img = m.imresize(img, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+        # img = m.imresize(img, (self.img_size[0], self.img_size[1]))  # uint8 with RGB mode
+        img = np.array(Image.fromarray(img).resize((self.img_size[0], self.img_size[1])))
         img = img[:, :, ::-1]  # RGB -> BGR
         img = img.astype(np.float64)
         img -= self.mean
@@ -107,7 +108,9 @@ class SUNRGBDLoader(data.Dataset):
 
         classes = np.unique(lbl)
         lbl = lbl.astype(float)
-        lbl = m.imresize(lbl, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
+        # lbl = m.imresize(lbl, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
+        print(np.unique(lbl.astype(int)))
+        lbl = np.array(Image.fromarray(lbl).resize((self.img_size[0], self.img_size[1]), Image.NEAREST))
         lbl = lbl.astype(int)
         # assert np.all(classes == np.unique(lbl))
         if not np.all(classes == np.unique(lbl)):
@@ -165,6 +168,13 @@ class SUNRGBDLoader(data.Dataset):
         hflip = 0.5
         vflip = 0.5
         degree = 60
+        PIL2Numpy = False
+
+        if isinstance(img, np.ndarray):
+          img = Image.fromarray(img, mode="RGB")
+          mask = Image.fromarray(mask, mode="L")
+          PIL2Numpy = True
+
         # gamma
         assert img.size == mask.size
         img = tf.adjust_gamma(img, random.uniform(1, 1 + gamma))
@@ -196,6 +206,10 @@ class SUNRGBDLoader(data.Dataset):
             fillcolor=250,
             shear=0.0,
         )
+        
+        if PIL2Numpy:
+          img, mask = np.array(img), np.array(mask, dtype=np.uint8)
+        
         return img, mask
 
 

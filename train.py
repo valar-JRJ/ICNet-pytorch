@@ -40,13 +40,13 @@ class Trainer(object):
         self.train_dataloader = data.DataLoader(dataset=train_dataset,
                                                 batch_size=cfg["train"]["train_batch_size"],
                                                 shuffle=True,
-                                                num_workers=4,
+                                                num_workers=0,
                                                 pin_memory=True,
                                                 drop_last=False)
         self.val_dataloader = data.DataLoader(dataset=val_dataset,
                                               batch_size=cfg["train"]["valid_batch_size"],
                                               shuffle=False,
-                                              num_workers=4,
+                                              num_workers=0,
                                               pin_memory=True,
                                               drop_last=False)
         
@@ -54,10 +54,11 @@ class Trainer(object):
         self.max_iters = cfg["train"]["epochs"] * self.iters_per_epoch
 
         # create network
-        self.model = ICNet(nclass = train_dataset.NUM_CLASS, backbone='resnet50').to(self.device)
+        self.model = ICNet(nclass = train_dataset.n_classes, backbone='resnet50').to(self.device)
         
         # create criterion
-        self.criterion = ICNetLoss(ignore_index=train_dataset.IGNORE_INDEX).to(self.device)
+        # self.criterion = ICNetLoss(ignore_index=train_dataset.IGNORE_INDEX).to(self.device)
+        self.criterion = ICNetLoss(ignore_index=-1).to(self.device)
         
         # optimizer, for model just includes pretrained, head and auxlayer
         params_list = list()
@@ -84,7 +85,7 @@ class Trainer(object):
              self.model = nn.DataParallel(self.model)
 
         # evaluation metrics
-        self.metric = SegmentationMetric(train_dataset.NUM_CLASS)
+        self.metric = SegmentationMetric(train_dataset.n_classes)
 
         self.current_mIoU = 0.0
         self.best_mIoU = 0.0
@@ -212,7 +213,7 @@ def save_checkpoint(model, cfg, epoch = 0, is_best=False, mIoU = 0.0, dataparall
 
 if __name__ == '__main__':
     # Set config file
-    config_path = "./configs/icnet.yaml"
+    config_path = "./configs/icnet-sunrgbd.yaml"
     with open(config_path, "r") as yaml_file:
         cfg = yaml.load(yaml_file.read())
         #print(cfg)
@@ -224,7 +225,7 @@ if __name__ == '__main__':
     num_gpus = len(cfg["train"]["specific_gpu_num"].split(','))
     print("torch.cuda.is_available(): {}".format(torch.cuda.is_available()))
     print("torch.cuda.device_count(): {}".format(torch.cuda.device_count()))
-    print("torch.cuda.current_device(): {}".format(torch.cuda.current_device()))
+    # print("torch.cuda.current_device(): {}".format(torch.cuda.current_device()))
 
     # Set logger
     logger = SetupLogger(name = "semantic_segmentation", 
@@ -233,8 +234,8 @@ if __name__ == '__main__':
                           filename='{}_{}_log.txt'.format(cfg["model"]["name"], cfg["model"]["backbone"]))
     logger.info("Using {} GPUs".format(num_gpus))
     logger.info("torch.cuda.is_available(): {}".format(torch.cuda.is_available()))
-    logger.info("torch.cuda.device_count(): {}".format(torch.cuda.device_count()))
-    logger.info("torch.cuda.current_device(): {}".format(torch.cuda.current_device()))
+    # logger.info("torch.cuda.device_count(): {}".format(torch.cuda.device_count()))
+    # logger.info("torch.cuda.current_device(): {}".format(torch.cuda.current_device()))
     logger.info(cfg)
     
     # Start train
