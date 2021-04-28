@@ -1,4 +1,26 @@
-2021-04-26 07:04:37,114 semantic_segmentation INFO: Using 1 GPUs
-2021-04-26 07:04:37,114 semantic_segmentation INFO: torch.cuda.is_available(): True
-2021-04-26 07:04:37,114 semantic_segmentation INFO: {'model': {'name': 'icnet', 'backbone': 'resnet50'}, 'optimizer': {'init_lr': 0.001, 'momentum': 0.9, 'weight_decay': 0.0005}, 'train': {'specific_gpu_num': '0', 'train_batch_size': 16, 'valid_batch_size': 16, 'data_path': '../data/sunrgbd/', 'epochs': 100, 'log_iter': 10, 'val_epoch': 1, 'ckpt_dir': './ckpt/'}, 'test': None}
-2021-04-26 07:04:41,395 semantic_segmentation INFO: Start training, Total Epochs: 100 = Total Iterations 33100
+2021-04-28 06:52:16,622 semantic_segmentation INFO: Using 1 GPUs
+2021-04-28 06:52:16,622 semantic_segmentation INFO: torch.cuda.is_available(): True
+2021-04-28 06:52:16,622 semantic_segmentation INFO: {'model': {'name': 'icnet', 'backbone': 'resnet50'}, 'optimizer': {'init_lr': 0.001, 'momentum': 0.9, 'weight_decay': 0.0005}, 'train': {'specific_gpu_num': '0', 'train_batch_size': 16, 'valid_batch_size': 16, 'data_path': '../data/sunrgbd/', 'epochs': 100, 'log_iter': 10, 'val_epoch': 1, 'ckpt_dir': './ckpt/'}, 'test': None}
+2021-04-28 06:52:20,929 semantic_segmentation INFO: Start training, Total Epochs: 100 = Total Iterations 33100
+2021-04-28 06:54:25,213 semantic_segmentation INFO: Epochs: 1/100 || Iters: 10/33100 || Lr: 0.001000 || Loss: 5.1511 || mIoU: 0.0163 || Cost Time: 0:02:04 || Estimated Time: 4 days, 18:08:31
+2021-04-28 06:56:23,624 semantic_segmentation INFO: Epochs: 1/100 || Iters: 20/33100 || Lr: 0.000999 || Loss: 4.5832 || mIoU: 0.0208 || Cost Time: 0:04:02 || Estimated Time: 4 days, 15:27:18
+2021-04-28 06:58:34,609 semantic_segmentation INFO: Epochs: 1/100 || Iters: 30/33100 || Lr: 0.000999 || Loss: 4.2273 || mIoU: 0.0257 || Cost Time: 0:06:13 || Estimated Time: 4 days, 18:23:17
+2021-04-28 07:00:36,779 semantic_segmentation INFO: Epochs: 1/100 || Iters: 40/33100 || Lr: 0.000999 || Loss: 4.1373 || mIoU: 0.0276 || Cost Time: 0:08:15 || Estimated Time: 4 days, 17:48:47
+2021-04-28 07:02:39,032 semantic_segmentation INFO: Epochs: 1/100 || Iters: 50/33100 || Lr: 0.000999 || Loss: 3.9791 || mIoU: 0.0300 || Cost Time: 0:10:18 || Estimated Time: 4 days, 17:28:11
+2021-04-28 07:04:39,675 semantic_segmentation INFO: Epochs: 1/100 || Iters: 60/33100 || Lr: 0.000998 || Loss: 3.9414 || mIoU: 0.0318 || Cost Time: 0:12:18 || Estimated Time: 4 days, 16:59:00
+2021-04-28 07:06:45,533 semantic_segmentation INFO: Epochs: 1/100 || Iters: 70/33100 || Lr: 0.000998 || Loss: 3.9727 || mIoU: 0.0337 || Cost Time: 0:14:24 || Estimated Time: 4 days, 17:18:36
+2021-04-28 07:08:47,681 semantic_segmentation INFO: Epochs: 1/100 || Iters: 80/33100 || Lr: 0.000998 || Loss: 3.8704 || mIoU: 0.0355 || Cost Time: 0:16:26 || Estimated Time: 4 days, 17:07:14
+2021-04-28 07:10:55,741 semantic_segmentation INFO: Epochs: 1/100 || Iters: 90/33100 || Lr: 0.000998 || Loss: 3.7910 || mIoU: 0.0373 || Cost Time: 0:18:34 || Estimated Time: 4 days, 17:34:06
+2021-04-28 07:13:04,075 semantic_segmentation INFO: Epochs: 1/100 || Iters: 100/33100 || Lr: 0.000997 || Loss: 3.7824 || mIoU: 0.0384 || Cost Time: 0:20:43 || Estimated Time: 4 days, 17:56:40
+2021-04-28 07:15:07,219 semantic_segmentation INFO: Epochs: 1/100 || Iters: 110/33100 || Lr: 0.000997 || Loss: 3.6431 || mIoU: 0.0393 || Cost Time: 0:22:46 || Estimated Time: 4 days, 17:48:48
+2021-04-28 07:17:08,259 semantic_segmentation INFO: Epochs: 1/100 || Iters: 120/33100 || Lr: 0.000997 || Loss: 3.3825 || mIoU: 0.0406 || Cost Time: 0:24:47 || Estimated Time: 4 days, 17:32:16
+2021-04-28 07:19:07,146 semantic_segmentation INFO: Epochs: 1/100 || Iters: 130/33100 || Lr: 0.000996 || Loss: 3.7300 || mIoU: 0.0421 || Cost Time: 0:26:46 || Estimated Time: 4 days, 17:08:52
+2021-04-28 07:21:09,013 semantic_segmentation INFO: Epochs: 1/100 || Iters: 140/33100 || Lr: 0.000996 || Loss: 3.3278 || mIoU: 0.0430 || Cost Time: 0:28:48 || Estimated Time: 4 days, 17:00:13
+2021-04-28 07:23:09,757 semantic_segmentation INFO: Epochs: 1/100 || Iters: 150/33100 || Lr: 0.000996 || Loss: 3.4085 || mIoU: 0.0438 || Cost Time: 0:30:48 || Estimated Time: 4 days, 16:48:21
+2021-04-28 07:25:11,160 semantic_segmentation INFO: Epochs: 1/100 || Iters: 160/33100 || Lr: 0.000996 || Loss: 3.4841 || mIoU: 0.0444 || Cost Time: 0:32:50 || Estimated Time: 4 days, 16:39:58
+2021-04-28 07:27:11,072 semantic_segmentation INFO: Epochs: 1/100 || Iters: 170/33100 || Lr: 0.000995 || Loss: 3.0957 || mIoU: 0.0453 || Cost Time: 0:34:50 || Estimated Time: 4 days, 16:27:31
+2021-04-28 07:29:12,723 semantic_segmentation INFO: Epochs: 1/100 || Iters: 180/33100 || Lr: 0.000995 || Loss: 3.3130 || mIoU: 0.0456 || Cost Time: 0:36:51 || Estimated Time: 4 days, 16:21:31
+2021-04-28 07:31:15,376 semantic_segmentation INFO: Epochs: 1/100 || Iters: 190/33100 || Lr: 0.000995 || Loss: 3.0794 || mIoU: 0.0464 || Cost Time: 0:38:54 || Estimated Time: 4 days, 16:18:51
+2021-04-28 07:33:15,335 semantic_segmentation INFO: Epochs: 1/100 || Iters: 200/33100 || Lr: 0.000995 || Loss: 3.5546 || mIoU: 0.0468 || Cost Time: 0:40:54 || Estimated Time: 4 days, 16:08:51
+2021-04-28 07:35:15,767 semantic_segmentation INFO: Epochs: 1/100 || Iters: 210/33100 || Lr: 0.000994 || Loss: 2.9089 || mIoU: 0.0480 || Cost Time: 0:42:54 || Estimated Time: 4 days, 16:00:50
+2021-04-28 07:37:20,193 semantic_segmentation INFO: Epochs: 1/100 || Iters: 220/33100 || Lr: 0.000994 || Loss: 3.1118 || mIoU: 0.0489 || Cost Time: 0:44:59 || Estimated Time: 4 days, 16:03:20

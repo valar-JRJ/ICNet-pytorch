@@ -110,7 +110,8 @@ class Trainer(object):
             list_mIoU = []
             list_loss = []
             self.metric.reset()
-            for i, (images, targets, _) in enumerate(self.train_dataloader):  
+            # for i, (images, targets, _) in enumerate(self.train_dataloader):
+            for i, (images, targets) in enumerate(self.train_dataloader):  
                 self.current_iteration += 1
                 
                 self.lr_scheduler.step()
@@ -171,7 +172,8 @@ class Trainer(object):
         lsit_pixAcc = []
         list_mIoU = []
         list_loss = []
-        for i, (image, targets, filename) in enumerate(self.val_dataloader):
+        # for i, (image, targets, filename) in enumerate(self.val_dataloader):
+        for i, (image, targets) in enumerate(self.val_dataloader):
             image = image.to(self.device)
             targets = targets.to(self.device)
             

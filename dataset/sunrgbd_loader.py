@@ -81,6 +81,7 @@ class SUNRGBDLoader(data.Dataset):
 
         lbl = Image.open(lbl_path)
         lbl = np.array(lbl, dtype=np.uint8)
+        # print(np.unique(lbl))
 
         if not (len(img.shape) == 3 and len(lbl.shape) == 2):
             return self.__getitem__(np.random.randint(0, self.__len__()))
@@ -109,7 +110,7 @@ class SUNRGBDLoader(data.Dataset):
         classes = np.unique(lbl)
         lbl = lbl.astype(float)
         # lbl = m.imresize(lbl, (self.img_size[0], self.img_size[1]), "nearest", mode="F")
-        print(np.unique(lbl.astype(int)))
+        # print(np.unique(lbl.astype(int)))
         lbl = np.array(Image.fromarray(lbl).resize((self.img_size[0], self.img_size[1]), Image.NEAREST))
         lbl = lbl.astype(int)
         # assert np.all(classes == np.unique(lbl))
@@ -174,6 +175,7 @@ class SUNRGBDLoader(data.Dataset):
           img = Image.fromarray(img, mode="RGB")
           mask = Image.fromarray(mask, mode="L")
           PIL2Numpy = True
+          # print('1 {}'.format(np.unique(mask)))
 
         # gamma
         assert img.size == mask.size
@@ -182,10 +184,12 @@ class SUNRGBDLoader(data.Dataset):
         if random.random() < hflip:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
             mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
+            # print('hflip {}'.format(np.unique(mask)))
         # vertical flip
         if random.random() < vflip:
             img = img.transpose(Image.FLIP_TOP_BOTTOM)
             mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
+            # print('vflip {}'.format(np.unique(mask)))
         # random rotate
         rotate_degree = random.random() * 2 * degree - degree
         img = tf.affine(
@@ -203,12 +207,15 @@ class SUNRGBDLoader(data.Dataset):
             scale=1.0,
             angle=rotate_degree,
             resample=Image.NEAREST,
-            fillcolor=250,
+            # fillcolor=250,
             shear=0.0,
         )
+        # print('rotate {}'.format(np.unique(mask)))
         
         if PIL2Numpy:
           img, mask = np.array(img), np.array(mask, dtype=np.uint8)
+          # print('2 {}'.format(np.unique(mask)))
+          
         
         return img, mask
 
