@@ -2,9 +2,12 @@ import os
 import time
 import datetime
 import yaml
+import random
+import shutil
 import torch
 import torch.nn as nn
 import torch.utils.data as data
+from tensorboardX import SummaryWriter
 
 from dataset import CityscapesDataset
 from dataset.sunrgbd_loader import SUNRGBDLoader
@@ -54,7 +57,7 @@ class Trainer(object):
         self.max_iters = cfg["train"]["epochs"] * self.iters_per_epoch
 
         # create network
-        self.model = ICNet(nclass = train_dataset.n_classes, backbone='resnet50').to(self.device)
+        self.model = ICNet(nclass=train_dataset.n_classes, backbone='resnet50').to(self.device)
         
         # create criterion
         # self.criterion = ICNetLoss(ignore_index=train_dataset.IGNORE_INDEX).to(self.device)
@@ -67,8 +70,8 @@ class Trainer(object):
         if hasattr(self.model, 'exclusive'):
             for module in self.model.exclusive:
                 params_list.append({'params': getattr(self.model, module).parameters(), 'lr': cfg["optimizer"]["init_lr"] * 10})
-        self.optimizer = torch.optim.SGD(params = params_list,
-                                         lr = cfg["optimizer"]["init_lr"],
+        self.optimizer = torch.optim.SGD(params=params_list,
+                                         lr=cfg["optimizer"]["init_lr"],
                                          momentum=cfg["optimizer"]["momentum"],
                                          weight_decay=cfg["optimizer"]["weight_decay"])
         # self.optimizer = torch.optim.SGD(params = self.model.parameters(),
@@ -93,6 +96,24 @@ class Trainer(object):
         self.epochs = cfg["train"]["epochs"]
         self.current_epoch = 0
         self.current_iteration = 0
+
+        if cfg["train"]["resume"] is not None:
+            if os.path.isfile(cfg["train"]["resume"]):
+                logger.info(
+                    "Loading model and optimizer from checkpoint '{}'".format(cfg["training"]["resume"])
+                )
+                checkpoint = torch.load(cfg["training"]["resume"])
+                self.model.load_state_dict(checkpoint["model_state"])
+                self.optimizer.load_state_dict(checkpoint["optimizer_state"])
+                self.lr_scheduler.load_state_dict(checkpoint["scheduler_state"])
+                self.current_epoch = checkpoint["epoch"]
+                logger.info(
+                    "Loaded checkpoint '{}' (iter {})".format(
+                        cfg["training"]["resume"], checkpoint["epoch"]
+                    )
+                )
+            else:
+                logger.info("No checkpoint found at '{}'".format(cfg["training"]["resume"]))
         
     def train(self):
         epochs, max_iters = self.epochs, self.max_iters
@@ -121,7 +142,7 @@ class Trainer(object):
                 
                 outputs = self.model(images)
                 loss = self.criterion(outputs, targets)
-		
+
                 self.metric.update(outputs[0], targets)
                 pixAcc, mIoU = self.metric.get()
                 lsit_pixAcc.append(pixAcc)
@@ -145,12 +166,15 @@ class Trainer(object):
                             mIoU,
                             str(datetime.timedelta(seconds=int(time.time() - start_time))), 
                             eta_string))
-		
+
             average_pixAcc = sum(lsit_pixAcc)/len(lsit_pixAcc)
             average_mIoU = sum(list_mIoU)/len(list_mIoU)
             average_loss = sum(list_loss)/len(list_loss)
             logger.info("Epochs: {:d}/{:d}, Average loss: {:.3f}, Average mIoU: {:.3f}, Average pixAcc: {:.3f}".format(self.current_epoch, self.epochs, average_loss, average_mIoU, average_pixAcc))
-		
+            writer.add_scalar("loss/train_loss", average_loss, self.current_epoch)
+            writer.add_scalar("miou/train_miou", average_mIoU, self.current_epoch)
+            writer.add_scalar("pixacc/train_pixacc", average_pixAcc, self.current_epoch)
+
             if self.current_iteration % val_per_iters == 0:
                 self.validation()
                 self.model.train()
@@ -191,24 +215,32 @@ class Trainer(object):
         average_loss = sum(list_loss)/len(list_loss)
         self.current_mIoU = average_mIoU
         logger.info("Validation: Average loss: {:.3f}, Average mIoU: {:.3f}, Average pixAcc: {:.3f}".format(average_loss,  average_mIoU, average_pixAcc))
-        
+        writer.add_scalar("loss/val_loss", average_loss, self.current_epoch)
+        writer.add_scalar("miou/val_miou", average_mIoU, self.current_epoch)
+        writer.add_scalar("pixacc/val_pixacc", average_pixAcc, self.current_epoch)
+
+
         if self.current_mIoU > self.best_mIoU:
             is_best = True
             self.best_mIoU = self.current_mIoU
         if is_best:
             save_checkpoint(self.model, self.cfg, self.current_epoch, is_best, self.current_mIoU, self.dataparallel)
-        
-def save_checkpoint(model, cfg, epoch = 0, is_best=False, mIoU = 0.0, dataparallel = False):
+
+
+def save_checkpoint(model, cfg, epoch=0, is_best=False, mIoU=0.0, dataparallel=False):
     """Save Checkpoint"""
     directory = os.path.expanduser(cfg["train"]["ckpt_dir"])
     if not os.path.exists(directory):
         os.makedirs(directory)
-    filename = '{}_{}_{}_{:.3f}.pth'.format(cfg["model"]["name"], cfg["model"]["backbone"],epoch,mIoU)
+    filename = '{}_{}_{}_{:.3f}.pth'.format(cfg["model"]["name"], cfg["model"]["backbone"], epoch, mIoU)
     filename = os.path.join(directory, filename)
     if dataparallel:
         model = model.module
     if is_best:
-        best_filename = '{}_{}_{}_{:.3f}_best_model.pth'.format(cfg["model"]["name"], cfg["model"]["backbone"],epoch,mIoU)
+        best_filename = '{}_{}_{}_{:.3f}_best_model.pth'.format(cfg["model"]["name"],
+                                                                cfg["model"]["backbone"],
+                                                                epoch,
+                                                                mIoU)
         best_filename = os.path.join(directory, best_filename)
         torch.save(model.state_dict(), best_filename)
         
@@ -229,18 +261,24 @@ if __name__ == '__main__':
     print("torch.cuda.device_count(): {}".format(torch.cuda.device_count()))
     # print("torch.cuda.current_device(): {}".format(torch.cuda.current_device()))
 
+    run_id = random.randint(1, 100000)
+    logdir = os.path.join("runs", 'icnet-sunrgbd', str(run_id))
+    writer = SummaryWriter(log_dir=logdir)
+
     # Set logger
-    logger = SetupLogger(name = "semantic_segmentation", 
-                          save_dir = cfg["train"]["ckpt_dir"], 
-                          distributed_rank = 0,
-                          filename='{}_{}_log.txt'.format(cfg["model"]["name"], cfg["model"]["backbone"]))
+    logger = SetupLogger(name="semantic_segmentation",
+                         save_dir=logdir,
+                         distributed_rank=0,
+                         filename='{}_{}_log.txt'.format(cfg["model"]["name"], cfg["model"]["backbone"]))
     logger.info("Using {} GPUs".format(num_gpus))
     logger.info("torch.cuda.is_available(): {}".format(torch.cuda.is_available()))
     # logger.info("torch.cuda.device_count(): {}".format(torch.cuda.device_count()))
     # logger.info("torch.cuda.current_device(): {}".format(torch.cuda.current_device()))
     logger.info(cfg)
-    
+
+    print("RUNDIR: {}".format(logdir))
+    shutil.copy(config_path, logdir)
+
     # Start train
     trainer = Trainer(cfg)
     trainer.train()
-    

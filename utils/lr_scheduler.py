@@ -7,6 +7,7 @@ from bisect import bisect_right
 
 __all__ = ['IterationPolyLR']
 
+
 class IterationPolyLR(torch.optim.lr_scheduler._LRScheduler):
     def __init__(self, optimizer, target_lr=0, max_iters=0, power=0.9, last_epoch=-1):
         self.target_lr = target_lr

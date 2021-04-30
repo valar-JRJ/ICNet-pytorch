@@ -19,6 +19,7 @@ train:
   log_iter: 10        # print log every log-iter 
   val_epoch: 1        # run validation every val-epoch
   ckpt_dir: "./ckpt/" # ckpt and trainning log will be saved here
+  resume:
 
 ### 4.Test
 test:
