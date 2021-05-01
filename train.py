@@ -9,10 +9,11 @@ import torch.nn as nn
 import torch.utils.data as data
 from tensorboardX import SummaryWriter
 
-from dataset import CityscapesDataset
+# from dataset import CityscapesDataset
 from dataset.sunrgbd_loader import SUNRGBDLoader
 from models import ICNet
 from utils import ICNetLoss, IterationPolyLR, SegmentationMetric, SetupLogger
+from torch.optim.lr_scheduler import MultiStepLR
 
 
 class Trainer(object):
@@ -80,12 +81,12 @@ class Trainer(object):
         #                                  weight_decay=cfg["optimizer"]["weight_decay"])
         
         # lr scheduler
-        self.lr_scheduler = IterationPolyLR(self.optimizer,
-                                            max_iters=self.max_iters,
-                                            power=0.9)
+        # self.lr_scheduler = IterationPolyLR(self.optimizer, max_iters=self.max_iters, power=0.9)
+        self.lr_scheduler = MultiStepLR(self.optimizer, milestones=[26000, 30000], gamma=0.1)
+
         # dataparallel
         if(self.dataparallel):
-             self.model = nn.DataParallel(self.model)
+            self.model = nn.DataParallel(self.model)
 
         # evaluation metrics
         self.metric = SegmentationMetric(train_dataset.n_classes)
@@ -218,7 +219,6 @@ class Trainer(object):
         writer.add_scalar("loss/val_loss", average_loss, self.current_epoch)
         writer.add_scalar("miou/val_miou", average_mIoU, self.current_epoch)
         writer.add_scalar("pixacc/val_pixacc", average_pixAcc, self.current_epoch)
-
 
         if self.current_mIoU > self.best_mIoU:
             is_best = True

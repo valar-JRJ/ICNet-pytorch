@@ -215,32 +215,31 @@ class SUNRGBDLoader(data.Dataset):
         if PIL2Numpy:
           img, mask = np.array(img), np.array(mask, dtype=np.uint8)
           # print('2 {}'.format(np.unique(mask)))
-          
-        
+
         return img, mask
 
 
 if __name__ == "__main__":
-    pass
-    # import matplotlib.pyplot as plt
+    # pass
+    import matplotlib.pyplot as plt
 
     # augmentations = Compose([Scale(512), RandomRotate(10), RandomHorizontallyFlip(0.5)])
 
-    # local_path = "../../../data/sunrgbd"
-    # dst = SUNRGBDLoader(local_path, is_transform=True, augmentations=augmentations)
-    # bs = 4
-    # trainloader = data.DataLoader(dst, batch_size=bs, num_workers=0)
-    # for i, data_samples in enumerate(trainloader):
-    #     imgs, labels = data_samples
-    #     imgs = imgs.numpy()[:, ::-1, :, :]
-    #     imgs = np.transpose(imgs, [0, 2, 3, 1])
-    #     f, axarr = plt.subplots(bs, 2)
-    #     for j in range(bs):
-    #         axarr[j][0].imshow(imgs[j])
-    #         axarr[j][1].imshow(dst.decode_segmap(labels.numpy()[j]))
-    #     plt.show()
-    #     a = input()
-    #     if a == "ex":
-    #         break
-    #     else:
-    #         plt.close()
+    local_path = "../../sunrgbd"
+    dst = SUNRGBDLoader(local_path, is_transform=True, img_size=(480, 480))
+    bs = 4
+    trainloader = data.DataLoader(dst, batch_size=bs, num_workers=0)
+    for i, data_samples in enumerate(trainloader):
+        imgs, labels = data_samples
+        imgs = imgs.numpy()[:, ::-1, :, :]
+        imgs = np.transpose(imgs, [0, 2, 3, 1])
+        f, axarr = plt.subplots(bs, 2)
+        for j in range(bs):
+            axarr[j][0].imshow(imgs[j])
+            axarr[j][1].imshow(dst.decode_segmap(labels.numpy()[j]))
+        plt.show()
+        a = input()
+        if a == "ex":
+            break
+        else:
+            plt.close()
