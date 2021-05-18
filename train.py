@@ -12,7 +12,7 @@ from tensorboardX import SummaryWriter
 # from dataset import CityscapesDataset
 from dataset.sunrgbd_loader import SUNRGBDLoader
 from models import ICNet
-from utils import ICNetLoss, IterationPolyLR, SegmentationMetric, SetupLogger
+from utils import ICNetLoss, IterationPolyLR, SegmentationMetric, SetupLogger, ConstantLR
 from torch.optim.lr_scheduler import MultiStepLR
 
 
@@ -34,12 +34,14 @@ class Trainer(object):
         train_dataset = SUNRGBDLoader(root=cfg["train"]["data_path"],
                                       split="training",
                                       is_transform=True,
-                                      img_size=(480, 480)
+                                      img_size=(cfg['train']['img_rows'], cfg['train']['img_cols']),
+                                      img_norm=True
                                       )
         val_dataset = SUNRGBDLoader(root=cfg["train"]["data_path"],
                                     split="val",
                                     is_transform=True,
-                                    img_size=(480, 480)
+                                    img_size=(cfg['train']['img_rows'], cfg['train']['img_cols']),
+                                    img_norm=True
                                     )
         self.train_dataloader = data.DataLoader(dataset=train_dataset,
                                                 batch_size=cfg["train"]["train_batch_size"],
@@ -82,10 +84,13 @@ class Trainer(object):
         
         # lr scheduler
         # self.lr_scheduler = IterationPolyLR(self.optimizer, max_iters=self.max_iters, power=0.9)
-        self.lr_scheduler = MultiStepLR(self.optimizer, milestones=[26000, 30000], gamma=0.1)
+        self.lr_scheduler = MultiStepLR(self.optimizer,
+                                        milestones=[20, 40, 60, 80, 100, 120, 140],
+                                        gamma=0.5)
+        # self.lr_scheduler = ConstantLR(self.optimizer)
 
         # dataparallel
-        if(self.dataparallel):
+        if self.dataparallel:
             self.model = nn.DataParallel(self.model)
 
         # evaluation metrics
@@ -101,20 +106,20 @@ class Trainer(object):
         if cfg["train"]["resume"] is not None:
             if os.path.isfile(cfg["train"]["resume"]):
                 logger.info(
-                    "Loading model and optimizer from checkpoint '{}'".format(cfg["training"]["resume"])
+                    "Loading model and optimizer from checkpoint '{}'".format(cfg["train"]["resume"])
                 )
-                checkpoint = torch.load(cfg["training"]["resume"])
+                checkpoint = torch.load(cfg["train"]["resume"])
                 self.model.load_state_dict(checkpoint["model_state"])
                 self.optimizer.load_state_dict(checkpoint["optimizer_state"])
                 self.lr_scheduler.load_state_dict(checkpoint["scheduler_state"])
                 self.current_epoch = checkpoint["epoch"]
                 logger.info(
                     "Loaded checkpoint '{}' (iter {})".format(
-                        cfg["training"]["resume"], checkpoint["epoch"]
+                        cfg["train"]["resume"], checkpoint["epoch"]
                     )
                 )
             else:
-                logger.info("No checkpoint found at '{}'".format(cfg["training"]["resume"]))
+                logger.info("No checkpoint found at '{}'".format(cfg["train"]["resume"]))
         
     def train(self):
         epochs, max_iters = self.epochs, self.max_iters
@@ -126,17 +131,17 @@ class Trainer(object):
         
         self.model.train()
         
-        for _ in range(self.epochs): 
+        # for _ in range(self.epochs):
+        while self.current_epoch <= self.epochs:
             self.current_epoch += 1
             lsit_pixAcc = []
             list_mIoU = []
             list_loss = []
             self.metric.reset()
+            self.lr_scheduler.step()
             # for i, (images, targets, _) in enumerate(self.train_dataloader):
             for i, (images, targets) in enumerate(self.train_dataloader):  
                 self.current_iteration += 1
-                
-                self.lr_scheduler.step()
 
                 images = images.to(self.device)
                 targets = targets.to(self.device)
@@ -224,25 +229,31 @@ class Trainer(object):
             is_best = True
             self.best_mIoU = self.current_mIoU
         if is_best:
-            save_checkpoint(self.model, self.cfg, self.current_epoch, is_best, self.current_mIoU, self.dataparallel)
+            self.save_checkpoint()
 
+    def save_checkpoint(self):
+        """Save Checkpoint"""
+        # directory = os.path.expanduser(cfg["train"]["ckpt_dir"])
+        directory = logdir
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        filename = '{}_{}_{}_{:.3f}.pth'.format(cfg["model"]["name"],
+                                                cfg["model"]["backbone"],
+                                                self.current_epoch,
+                                                self.current_mIoU)
+        filename = os.path.join(directory, filename)
+        if self.dataparallel:
+            model = self.model.module
 
-def save_checkpoint(model, cfg, epoch=0, is_best=False, mIoU=0.0, dataparallel=False):
-    """Save Checkpoint"""
-    directory = os.path.expanduser(cfg["train"]["ckpt_dir"])
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-    filename = '{}_{}_{}_{:.3f}.pth'.format(cfg["model"]["name"], cfg["model"]["backbone"], epoch, mIoU)
-    filename = os.path.join(directory, filename)
-    if dataparallel:
-        model = model.module
-    if is_best:
-        best_filename = '{}_{}_{}_{:.3f}_best_model.pth'.format(cfg["model"]["name"],
-                                                                cfg["model"]["backbone"],
-                                                                epoch,
-                                                                mIoU)
-        best_filename = os.path.join(directory, best_filename)
-        torch.save(model.state_dict(), best_filename)
+            state = {
+                "epoch": self.current_epoch,
+                "model_state": model.state_dict(),
+                "optimizer_state": self.optimizer.state_dict(),
+                "scheduler_state": self.lr_scheduler.state_dict(),
+                "best_iou": self.best_mIoU,
+            }
+            best_filename = os.path.join(directory, filename)
+            torch.save(state, best_filename)
         
 
 if __name__ == '__main__':

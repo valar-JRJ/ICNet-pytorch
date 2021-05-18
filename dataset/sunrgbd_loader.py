@@ -3,8 +3,7 @@ import collections
 import random
 import torch
 import numpy as np
-from PIL import Image
-import scipy.misc as m
+from PIL import Image, ImageOps
 import torchvision.transforms.functional as tf
 
 from torch.utils import data
@@ -169,6 +168,8 @@ class SUNRGBDLoader(data.Dataset):
         hflip = 0.5
         vflip = 0.5
         degree = 60
+        crop_size = 480
+        base_size = 520
         PIL2Numpy = False
 
         if isinstance(img, np.ndarray):
@@ -178,38 +179,67 @@ class SUNRGBDLoader(data.Dataset):
           # print('1 {}'.format(np.unique(mask)))
 
         # gamma
-        assert img.size == mask.size
-        img = tf.adjust_gamma(img, random.uniform(1, 1 + gamma))
+        # assert img.size == mask.size
+        # img = tf.adjust_gamma(img, random.uniform(1, 1 + gamma))
+
+        # random scale (short edge)
+        short_size = random.randint(int(base_size * 0.7), int(base_size * 2.0))
+        w, h = img.size
+        if h > w:
+            ow = short_size
+            oh = int(1.0 * h * ow / w)
+        else:
+            oh = short_size
+            ow = int(1.0 * w * oh / h)
+        img = img.resize((ow, oh), Image.BILINEAR)
+        mask = mask.resize((ow, oh), Image.NEAREST)
+        #
+        # # pad crop
+        if short_size < crop_size:
+            padh = crop_size - oh if oh < crop_size else 0
+            padw = crop_size - ow if ow < crop_size else 0
+            img = ImageOps.expand(img, border=(0, 0, padw, padh), fill=0)
+            mask = ImageOps.expand(mask, border=(0, 0, padw, padh), fill=0)
+
+        # # random crop crop_size
+        w, h = img.size
+        x1 = random.randint(0, w - crop_size)
+        y1 = random.randint(0, h - crop_size)
+        img = img.crop((x1, y1, x1 + crop_size, y1 + crop_size))
+        mask = mask.crop((x1, y1, x1 + crop_size, y1 + crop_size))
+
         # horizontal flip
         if random.random() < hflip:
             img = img.transpose(Image.FLIP_LEFT_RIGHT)
             mask = mask.transpose(Image.FLIP_LEFT_RIGHT)
             # print('hflip {}'.format(np.unique(mask)))
+
         # vertical flip
         if random.random() < vflip:
             img = img.transpose(Image.FLIP_TOP_BOTTOM)
             mask = mask.transpose(Image.FLIP_TOP_BOTTOM)
             # print('vflip {}'.format(np.unique(mask)))
+
         # random rotate
-        rotate_degree = random.random() * 2 * degree - degree
-        img = tf.affine(
-            img,
-            translate=(0, 0),
-            scale=1.0,
-            angle=rotate_degree,
-            resample=Image.BILINEAR,
-            fillcolor=(0, 0, 0),
-            shear=0.0,
-        )
-        mask = tf.affine(
-            mask,
-            translate=(0, 0),
-            scale=1.0,
-            angle=rotate_degree,
-            resample=Image.NEAREST,
-            # fillcolor=250,
-            shear=0.0,
-        )
+        # rotate_degree = random.random() * 2 * degree - degree
+        # img = tf.affine(
+        #     img,
+        #     translate=(0, 0),
+        #     scale=1.0,
+        #     angle=rotate_degree,
+        #     resample=Image.BILINEAR,
+        #     fillcolor=(0, 0, 0),
+        #     shear=0.0,
+        # )
+        # mask = tf.affine(
+        #     mask,
+        #     translate=(0, 0),
+        #     scale=1.0,
+        #     angle=rotate_degree,
+        #     resample=Image.NEAREST,
+        #     # fillcolor=250,
+        #     shear=0.0,
+        # )
         # print('rotate {}'.format(np.unique(mask)))
         
         if PIL2Numpy:
@@ -225,8 +255,8 @@ if __name__ == "__main__":
 
     # augmentations = Compose([Scale(512), RandomRotate(10), RandomHorizontallyFlip(0.5)])
 
-    local_path = "../../sunrgbd"
-    dst = SUNRGBDLoader(local_path, is_transform=True, img_size=(480, 480))
+    local_path = "../../data/samples"
+    dst = SUNRGBDLoader(local_path, is_transform=True, img_size=(530, 530), img_norm=True)
     bs = 4
     trainloader = data.DataLoader(dst, batch_size=bs, num_workers=0)
     for i, data_samples in enumerate(trainloader):
