@@ -31,3 +31,28 @@ class ConstantLR(_LRScheduler):
     def get_lr(self):
         return [base_lr for base_lr in self.base_lrs]
 
+
+class PloyStepLR(_LRScheduler):
+    def __init__(self, optimizer, milestone=8000, gamma=0.5, last_epoch=-1):
+        self.milestone = milestone
+        self.gamma = gamma
+        super(PloyStepLR, self).__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        factor = self.gamma**(self.last_epoch/self.milestone)
+        return [base_lr*factor for base_lr in self.base_lrs]
+
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    gamma = 0.5
+    milestone = 8000
+    max_iter = 66150
+    init_lr = 0.01
+    x = np.arange(0, max_iter)
+    y_step = init_lr*gamma**(x/milestone)
+    plt.title('polystep')
+    plt.plot(x, y_step)
+    plt.show()

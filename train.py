@@ -7,12 +7,14 @@ import shutil
 import torch
 import torch.nn as nn
 import torch.utils.data as data
+from tqdm import tqdm
 from tensorboardX import SummaryWriter
 
 # from dataset import CityscapesDataset
 from dataset.sunrgbd_loader import SUNRGBDLoader
 from models import ICNet
-from utils import ICNetLoss, IterationPolyLR, runningScore, averageMeter, SetupLogger, ConstantLR
+from utils import ICNetLoss, runningScore, averageMeter, SetupLogger
+from utils.lr_scheduler import PloyStepLR
 from torch.optim.lr_scheduler import MultiStepLR
 
 
@@ -84,9 +86,7 @@ class Trainer(object):
         
         # lr scheduler
         # self.lr_scheduler = IterationPolyLR(self.optimizer, max_iters=self.max_iters, power=0.9)
-        self.lr_scheduler = MultiStepLR(self.optimizer,
-                                        milestones=[20, 40, 60, 80, 100, 120, 140],
-                                        gamma=0.5)
+        self.lr_scheduler = PloyStepLR(self.optimizer, milestone=6600)
         # self.lr_scheduler = ConstantLR(self.optimizer)
 
         # dataparallel
@@ -135,11 +135,12 @@ class Trainer(object):
         # for _ in range(self.epochs):
         while self.current_epoch <= self.epochs:
             self.current_epoch += 1
-            self.lr_scheduler.step()
+            # self.lr_scheduler.step()
             # for i, (images, targets, _) in enumerate(self.train_dataloader):
             for i, (images, targets) in enumerate(self.train_dataloader):  
                 self.current_iteration += 1
                 start_time = time.time()
+                self.lr_scheduler.step()
 
                 images = images.to(self.device)
                 targets = targets.to(self.device)
@@ -174,7 +175,6 @@ class Trainer(object):
             writer.add_scalar("loss/train_loss", train_loss_meter.avg, self.current_epoch)
             score, class_iou = self.metric.get_scores()
             for k, v in score.items():
-                print(k, v)
                 logger.info("{}: {}".format(k, v))
                 writer.add_scalar("train_metrics/{}".format(k), v, self.current_epoch)
 
@@ -197,7 +197,7 @@ class Trainer(object):
         model.eval()
         val_loss_meter = averageMeter()
         # for i, (image, targets, filename) in enumerate(self.val_dataloader):
-        for i, (image, targets) in enumerate(self.val_dataloader):
+        for i, (image, targets) in tqdm(enumerate(self.val_dataloader)):
             image = image.to(self.device)
             targets = targets.to(self.device)
             
@@ -245,16 +245,18 @@ class Trainer(object):
         filename = os.path.join(directory, filename)
         if self.dataparallel:
             model = self.model.module
+        else:
+            model = self.model
 
-            state = {
-                "epoch": self.current_epoch,
-                "model_state": model.state_dict(),
-                "optimizer_state": self.optimizer.state_dict(),
-                "scheduler_state": self.lr_scheduler.state_dict(),
-                "best_iou": self.best_mIoU,
-            }
-            best_filename = os.path.join(directory, filename)
-            torch.save(state, best_filename)
+        state = {
+            "epoch": self.current_epoch,
+            "model_state": model.state_dict(),
+            "optimizer_state": self.optimizer.state_dict(),
+            "scheduler_state": self.lr_scheduler.state_dict(),
+            "best_iou": self.best_mIoU,
+        }
+        best_filename = os.path.join(directory, filename)
+        torch.save(state, best_filename)
         
 
 if __name__ == '__main__':
