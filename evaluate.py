@@ -11,8 +11,8 @@ import torch.utils.data as data
 from PIL import Image
 from torchvision import transforms
 from models import ICNet
-from dataset import CityscapesDataset
-from utils import ICNetLoss, IterationPolyLR, SegmentationMetric, SetupLogger, get_color_pallete
+from dataset.sunrgbd_loader import SUNRGBDLoader
+from utils import ICNetLoss, IterationPolyLR, runningScore, averageMeter, SetupLogger, get_color_pallete
 
 class Evaluator(object):
     def __init__(self, cfg):
@@ -20,7 +20,7 @@ class Evaluator(object):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # get valid dataset images and targets
-        self.image_paths, self.mask_paths = _get_city_pairs(cfg["train"]["cityscapes_root"], "val")
+        self.loader = SUNRGBDLoader()
 
         # create network
         self.model = ICNet(nclass = 19, backbone='resnet50').to(self.device)

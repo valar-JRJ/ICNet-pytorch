@@ -12,7 +12,7 @@ from tensorboardX import SummaryWriter
 # from dataset import CityscapesDataset
 from dataset.sunrgbd_loader import SUNRGBDLoader
 from models import ICNet
-from utils import ICNetLoss, IterationPolyLR, SegmentationMetric, SetupLogger, ConstantLR
+from utils import ICNetLoss, IterationPolyLR, runningScore, averageMeter, SetupLogger, ConstantLR
 from torch.optim.lr_scheduler import MultiStepLR
 
 
@@ -94,7 +94,7 @@ class Trainer(object):
             self.model = nn.DataParallel(self.model)
 
         # evaluation metrics
-        self.metric = SegmentationMetric(train_dataset.n_classes)
+        self.metric = runningScore(train_dataset.n_classes)
 
         self.current_mIoU = 0.0
         self.best_mIoU = 0.0
@@ -126,7 +126,8 @@ class Trainer(object):
         log_per_iters = self.cfg["train"]["log_iter"]
         val_per_iters = self.cfg["train"]["val_epoch"] * self.iters_per_epoch
         
-        start_time = time.time()
+        time_meter = averageMeter()
+        train_loss_meter = averageMeter()
         logger.info('Start training, Total Epochs: {:d} = Total Iterations {:d}'.format(epochs, max_iters))
         
         self.model.train()
@@ -134,74 +135,67 @@ class Trainer(object):
         # for _ in range(self.epochs):
         while self.current_epoch <= self.epochs:
             self.current_epoch += 1
-            lsit_pixAcc = []
-            list_mIoU = []
-            list_loss = []
-            self.metric.reset()
             self.lr_scheduler.step()
             # for i, (images, targets, _) in enumerate(self.train_dataloader):
             for i, (images, targets) in enumerate(self.train_dataloader):  
                 self.current_iteration += 1
+                start_time = time.time()
 
                 images = images.to(self.device)
                 targets = targets.to(self.device)
                 
                 outputs = self.model(images)
                 loss = self.criterion(outputs, targets)
+                pred = outputs[0].data.max(1)[1].cpu().numpy()
+                gt = targets.data.cpu().numpy()
 
-                self.metric.update(outputs[0], targets)
-                pixAcc, mIoU = self.metric.get()
-                lsit_pixAcc.append(pixAcc)
-                list_mIoU.append(mIoU)
-                list_loss.append(loss.item())
+                self.metric.update(gt, pred)
+                train_loss_meter.update(loss.item())
 
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
 
-                eta_seconds = ((time.time() - start_time) / self.current_iteration) * (max_iters - self.current_iteration)
-                eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
+                time_meter.update(time.time() - start_time)
                 
                 if self.current_iteration % log_per_iters == 0:
+                    eta_seconds = time_meter.avg * (max_iters - self.current_iteration)
+                    eta_string = str(datetime.timedelta(seconds=int(eta_seconds)))
                     logger.info(
-                        "Epochs: {:d}/{:d} || Iters: {:d}/{:d} || Lr: {:.6f} || Loss: {:.4f} || mIoU: {:.4f} || Cost Time: {} || Estimated Time: {}".format(
+                        "Epochs: {:d}/{:d} || Iters: {:d}/{:d} || Lr: {:.6f} || Loss: {:.4f} || Cost Time: {} || Estimated Time: {}".format(
                             self.current_epoch, self.epochs, 
                             self.current_iteration, max_iters, 
                             self.optimizer.param_groups[0]['lr'], 
-                            loss.item(), 
-                            mIoU,
-                            str(datetime.timedelta(seconds=int(time.time() - start_time))), 
+                            loss.item(),
+                            str(datetime.timedelta(seconds=int(time_meter.val))),
                             eta_string))
+                    time_meter.reset()
 
-            average_pixAcc = sum(lsit_pixAcc)/len(lsit_pixAcc)
-            average_mIoU = sum(list_mIoU)/len(list_mIoU)
-            average_loss = sum(list_loss)/len(list_loss)
-            logger.info("Epochs: {:d}/{:d}, Average loss: {:.3f}, Average mIoU: {:.3f}, Average pixAcc: {:.3f}".format(self.current_epoch, self.epochs, average_loss, average_mIoU, average_pixAcc))
-            writer.add_scalar("loss/train_loss", average_loss, self.current_epoch)
-            writer.add_scalar("miou/train_miou", average_mIoU, self.current_epoch)
-            writer.add_scalar("pixacc/train_pixacc", average_pixAcc, self.current_epoch)
+            writer.add_scalar("loss/train_loss", train_loss_meter.avg, self.current_epoch)
+            score, class_iou = self.metric.get_scores()
+            for k, v in score.items():
+                print(k, v)
+                logger.info("{}: {}".format(k, v))
+                writer.add_scalar("train_metrics/{}".format(k), v, self.current_epoch)
+
+            for k, v in class_iou.items():
+                logger.info("{}: {}".format(k, v))
+
+            self.metric.reset()
+            train_loss_meter.reset()
 
             if self.current_iteration % val_per_iters == 0:
                 self.validation()
                 self.model.train()
 
-        total_training_time = time.time() - start_time
-        total_training_str = str(datetime.timedelta(seconds=total_training_time))
-        logger.info(
-            "Total training time: {} ({:.4f}s / it)".format(
-            total_training_str, total_training_time / max_iters))
-
     def validation(self):
         is_best = False
-        self.metric.reset()
         if self.dataparallel:
             model = self.model.module
         else:
             model = self.model
         model.eval()
-        lsit_pixAcc = []
-        list_mIoU = []
-        list_loss = []
+        val_loss_meter = averageMeter()
         # for i, (image, targets, filename) in enumerate(self.val_dataloader):
         for i, (image, targets) in enumerate(self.val_dataloader):
             image = image.to(self.device)
@@ -210,20 +204,27 @@ class Trainer(object):
             with torch.no_grad():
                 outputs = model(image)
                 loss = self.criterion(outputs, targets)
-            self.metric.update(outputs[0], targets)
-            pixAcc, mIoU = self.metric.get()
-            lsit_pixAcc.append(pixAcc)
-            list_mIoU.append(mIoU)
-            list_loss.append(loss.item())
+                pred = outputs[0].data.max(1)[1].cpu().numpy()
+                gt = targets.data.cpu().numpy()
 
-        average_pixAcc = sum(lsit_pixAcc)/len(lsit_pixAcc)
-        average_mIoU = sum(list_mIoU)/len(list_mIoU)
-        average_loss = sum(list_loss)/len(list_loss)
-        self.current_mIoU = average_mIoU
-        logger.info("Validation: Average loss: {:.3f}, Average mIoU: {:.3f}, Average pixAcc: {:.3f}".format(average_loss,  average_mIoU, average_pixAcc))
-        writer.add_scalar("loss/val_loss", average_loss, self.current_epoch)
-        writer.add_scalar("miou/val_miou", average_mIoU, self.current_epoch)
-        writer.add_scalar("pixacc/val_pixacc", average_pixAcc, self.current_epoch)
+            self.metric.update(gt, pred)
+            val_loss_meter.update(loss.item())
+
+        logger.info("epoch %d Loss: %.4f" % (self.current_epoch, val_loss_meter.avg))
+        writer.add_scalar("loss/val_loss", val_loss_meter.avg, self.current_epoch)
+        score, class_iou = self.metric.get_scores()
+        for k, v in score.items():
+            logger.info("{}: {}".format(k, v))
+            writer.add_scalar("val_metrics/{}".format(k), v, self.current_epoch)
+
+        for k, v in class_iou.items():
+            logger.info("{}: {}".format(k, v))
+            writer.add_scalar("val_metrics/cls_{}".format(k), v, self.current_epoch)
+        self.current_mIoU = score["Mean IoU : \t"]
+        logger.info("Validation: Average loss: {:.3f}, mIoU: {:.3f}, mean pixAcc: {:.3f}"
+                    .format(val_loss_meter.avg,  self.current_mIoU, score["Mean Acc : \t"]))
+        self.metric.reset()
+        val_loss_meter.reset()
 
         if self.current_mIoU > self.best_mIoU:
             is_best = True
