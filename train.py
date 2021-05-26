@@ -13,7 +13,7 @@ from tensorboardX import SummaryWriter
 # from dataset import CityscapesDataset
 from dataset.sunrgbd_loader import SUNRGBDLoader
 from models import ICNet
-from utils import ICNetLoss, runningScore, averageMeter, SetupLogger
+from utils import ICNetLoss, runningScore, averageMeter, SetupLogger, get_logger
 from utils.lr_scheduler import PloyStepLR
 from torch.optim.lr_scheduler import MultiStepLR
 
@@ -86,7 +86,7 @@ class Trainer(object):
         
         # lr scheduler
         # self.lr_scheduler = IterationPolyLR(self.optimizer, max_iters=self.max_iters, power=0.9)
-        self.lr_scheduler = PloyStepLR(self.optimizer, milestone=6600)
+        self.lr_scheduler = PloyStepLR(self.optimizer, milestone=3500)
         # self.lr_scheduler = ConstantLR(self.optimizer)
 
         # dataparallel
@@ -170,11 +170,20 @@ class Trainer(object):
                             loss.item(),
                             str(datetime.timedelta(seconds=int(time_meter.val))),
                             eta_string))
+                    print(
+                        "Epochs: {:d}/{:d} || Iters: {:d}/{:d} || Lr: {:.6f} || Loss: {:.4f} || Cost Time: {} || Estimated Time: {}".format(
+                            self.current_epoch, self.epochs,
+                            self.current_iteration, max_iters,
+                            self.optimizer.param_groups[0]['lr'],
+                            loss.item(),
+                            str(datetime.timedelta(seconds=int(time_meter.val))),
+                            eta_string))
                     time_meter.reset()
 
             writer.add_scalar("loss/train_loss", train_loss_meter.avg, self.current_epoch)
             score, class_iou = self.metric.get_scores()
             for k, v in score.items():
+                print(k, v)
                 logger.info("{}: {}".format(k, v))
                 writer.add_scalar("train_metrics/{}".format(k), v, self.current_epoch)
 
@@ -214,6 +223,7 @@ class Trainer(object):
         writer.add_scalar("loss/val_loss", val_loss_meter.avg, self.current_epoch)
         score, class_iou = self.metric.get_scores()
         for k, v in score.items():
+            print(k, v)
             logger.info("{}: {}".format(k, v))
             writer.add_scalar("val_metrics/{}".format(k), v, self.current_epoch)
 
@@ -255,8 +265,8 @@ class Trainer(object):
             "scheduler_state": self.lr_scheduler.state_dict(),
             "best_iou": self.best_mIoU,
         }
-        best_filename = os.path.join(directory, filename)
-        torch.save(state, best_filename)
+        # best_filename = os.path.join(directory, filename)
+        torch.save(state, filename)
         
 
 if __name__ == '__main__':
@@ -280,10 +290,11 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=logdir)
 
     # Set logger
-    logger = SetupLogger(name="semantic_segmentation",
-                         save_dir=logdir,
-                         distributed_rank=0,
-                         filename='{}_{}_log.txt'.format(cfg["model"]["name"], cfg["model"]["backbone"]))
+    # logger = SetupLogger(name="semantic_segmentation",
+    #                      save_dir=logdir,
+    #                      distributed_rank=0,
+    #                      filename='{}_{}_log.txt'.format(cfg["model"]["name"], cfg["model"]["backbone"]))
+    logger = get_logger(logdir)
     logger.info("Using {} GPUs".format(num_gpus))
     logger.info("torch.cuda.is_available(): {}".format(torch.cuda.is_available()))
     # logger.info("torch.cuda.device_count(): {}".format(torch.cuda.device_count()))
